@@ -17,7 +17,10 @@ PROMPT = "> "
 COMMANDS = ["help",
             "listvar",
             "plot",
-            "quit"]
+            "quit",
+            "replot",
+            "save",
+            "set"]
 
 # this is a global -- we will work with a single file and cache it
 CURRENT_FILE = None
