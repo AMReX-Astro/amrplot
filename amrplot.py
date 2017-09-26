@@ -27,9 +27,10 @@ CURRENT_FILE = None
 
 class FileInfo(object):
     """ cache the file info so we don't have to continually load things """
-    
+
     def __init__(self, filename):
-        self.name = filename
+        self.name = filename.replace("\"", "").replace("'", "")
+        print("trying to open: {}", self.name)
         try:
             self.ds = yt.load(self.name)
         except yt_except.YTOutputNotIdentified:
@@ -82,7 +83,7 @@ def main():
 
         if cmd_str == "":
             continue
-        
+
         parts = cmd_str.split()
         command = parts[0].lower()
 
@@ -110,6 +111,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-    
