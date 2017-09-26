@@ -90,9 +90,9 @@ def plot_cmd(ss, pp):
     """ plot command takes 2 arguments: plotfile, variable name """
 
     ss.file_info.load(pp[0])
-
-    slc = CURRENT_FILE.ds.slice("z")
-    plt.show()
+    ds = ss.file_info.ds
+    slc = yt.SlicePlot(ds, "z", "density")
+    slc.show()
 
 
 def main():
