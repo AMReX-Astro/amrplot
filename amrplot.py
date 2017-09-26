@@ -22,60 +22,85 @@ COMMANDS = ["help",
             "save",
             "set"]
 
-# this is a global -- we will work with a single file and cache it
-CURRENT_FILE = None
-
 class FileInfo(object):
     """ cache the file info so we don't have to continually load things """
 
-    def __init__(self, filename):
-        self.name = filename.replace("\"", "").replace("'", "")
-        print("trying to open: {}", self.name)
-        try:
-            self.ds = yt.load(self.name)
-        except yt_except.YTOutputNotIdentified:
-            print("file unable to be opened\n")
-            raise IOError()
+    def __init__(self):
+        self.name = None
+        self.varlist = None
 
-        self.ds.index
-        self.varlist = self.ds.field_list
+    def load(self, filename):
+        filename = filename.replace("\"", "").replace("'", "")
 
-def listvar_cmd(pp):
+        # only load if it is a new file
+        if filename != self.name:
+            self.name = filename
+            print("trying to open: {}", self.name)
+            try:
+                self.ds = yt.load(self.name)
+            except yt_except.YTOutputNotIdentified:
+                print("file unable to be opened\n")
+                self.name = None
+                raise IOError()
+
+            self.ds.index
+            self.varlist = self.ds.field_list
+
+class State(object):
+    """ keep track of the current state of the plot, limits, etc"""
+
+    def __init__(self, file_info):
+        self.file_info = file_info
+
+        # coordinate limits
+        self.xbounds = None
+        self.ybounds = None
+        self.zbounds = None
+
+        # variable limits
+        self.varname = None
+        self.vbounds = None
+
+        self.log = 0
+
+    def reset(self):
+        # coordinate limits
+        self.xbounds = None
+        self.ybounds = None
+        self.zbounds = None
+
+        # variable limits
+        self.varname = None
+        self.vbounds = None
+
+        self.log = 0
+
+
+def listvar_cmd(ss, pp):
     """ listvar command takes a single argument: plotfile """
-    global CURRENT_FILE
 
-    pfile = pp[0]
-    if CURRENT_FILE is None or CURRENT_FILE.name != pfile:
-        try:
-            CURRENT_FILE = FileInfo(pfile)
-        except IOError:
-            return
+    ss.file_info.load(pp[0])
 
-    for f in CURRENT_FILE.varlist:
+    for f in ss.file_info.varlist:
         print(f)
     print("")
 
-def plot_cmd(pp):
-    """ plot command takes 2 arguments: plotfile, variable name """
-    global CURRENT_FILE
 
-    pfile = pp[0]
-    if CURRENT_FILE is None or CURRENT_FILE.name != pfile:
-        try:
-            CURRENT_FILE = FileInfo(pfile)
-        except IOError:
-            return
+def plot_cmd(ss, pp):
+    """ plot command takes 2 arguments: plotfile, variable name """
+
+    ss.file_info.load(pp[0])
 
     slc = CURRENT_FILE.ds.slice("z")
     plt.show()
 
-    for f in CURRENT_FILE.varlist:
-        print(f)
-    print("")
 
 def main():
 
     print("Welcome to amrplot.  Type 'help' for a list of commands.\n")
+
+    ff = FileInfo()
+    ss = State(ff)
 
     while True:
 
@@ -87,9 +112,7 @@ def main():
         parts = cmd_str.split()
         command = parts[0].lower()
 
-        # # the file is always the second part, for commands that take
-        # # arguments
-        # filename = parts[1]
+        # every function takes a file object, a state object, and any commands
 
         if command not in COMMANDS:
             print("invalid command\n")
@@ -107,7 +130,7 @@ def main():
             fname = "{}_cmd".format(command)
             this_module = sys.modules[__name__]
             method_to_call = getattr(this_module, fname)
-            method_to_call(parts[1:])
+            method_to_call(ss, parts[1:])
 
 if __name__ == "__main__":
     main()
