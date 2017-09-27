@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 
+import matplotlib as mpl
+mpl.use("QT4Agg")
+
 import readline
 import sys
 
 import yt
 import yt.utilities.exceptions as yt_except
-import matplotlib as mpl
+
+yt.toggle_interactivity()
 
 readline.parse_and_bind("tab: complete")
 readline.parse_and_bind('set editing-mode emacs')
