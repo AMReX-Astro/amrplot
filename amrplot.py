@@ -105,6 +105,11 @@ def plot_cmd(ss, pp):
     slc.show()
 
 
+def reset_cmd(ss, pp):
+    """ reset the plot attributes """
+    ss.reset()
+
+
 def main():
 
     print("Welcome to amrplot.  Type 'help' for a list of commands.\n")
