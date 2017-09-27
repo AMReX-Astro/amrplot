@@ -23,6 +23,7 @@ COMMANDS = ["help",
             "plot",
             "quit",
             "replot",
+            "reset",
             "save",
             "set"]
 
@@ -83,11 +84,16 @@ class State(object):
 def listvar_cmd(ss, pp):
     """ listvar command takes a single argument: plotfile """
 
-    ss.file_info.load(pp[0])
+    try:
+        filename = pp[0]
+    except IndexError:
+        pass
+    else:
+        ss.file_info.load(pp[0])
 
-    for f in ss.file_info.varlist:
-        print(f)
-    print("")
+    if not ss.file_info.name is None:
+        for f in ss.file_info.varlist:
+            print(f)
 
 
 def plot_cmd(ss, pp):
@@ -135,6 +141,7 @@ def main():
             this_module = sys.modules[__name__]
             method_to_call = getattr(this_module, fname)
             method_to_call(ss, parts[1:])
+            print("")
 
 if __name__ == "__main__":
     main()
