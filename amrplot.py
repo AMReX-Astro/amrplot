@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
 import matplotlib as mpl
-mpl.use("QT4Agg")
+mpl.use("QT5Agg")
+
+import matplotlib.pyplot as plt
 
 import readline
 import sys
@@ -9,8 +11,14 @@ import sys
 import yt
 import yt.utilities.exceptions as yt_except
 
+# assume that our data is in CGS
+from yt.units import cm
+
+#plt.ion()
 yt.toggle_interactivity()
 
+# look at this for history persistance (using atexit):
+# https://gist.github.com/thanhtphung/20980ebee86e24933b13
 readline.parse_and_bind("tab: complete")
 readline.parse_and_bind('set editing-mode emacs')
 
@@ -50,12 +58,15 @@ class FileInfo(object):
 
             self.ds.index
             self.varlist = self.ds.field_list
+            self.is_axisymmetric = self.ds.geometry == "cylindrical"
 
 class State(object):
     """ keep track of the current state of the plot, limits, etc"""
 
     def __init__(self, file_info):
         self.file_info = file_info
+
+        self.figure = plt.figure()
 
         # coordinate limits
         self.xbounds = None
@@ -66,7 +77,7 @@ class State(object):
         self.varname = None
         self.vbounds = None
 
-        self.log = 0
+        self.log = False
 
     def reset(self):
         # coordinate limits
@@ -78,7 +89,7 @@ class State(object):
         self.varname = None
         self.vbounds = None
 
-        self.log = 0
+        self.log = False
 
 
 def listvar_cmd(ss, pp):
@@ -101,8 +112,33 @@ def plot_cmd(ss, pp):
 
     ss.file_info.load(pp[0])
     ds = ss.file_info.ds
-    slc = yt.SlicePlot(ds, "z", "density")
+
+    ss.varname = pp[1]
+
+    if ss.file_info.is_axisymmetric:
+        slc = yt.SlicePlot(ds, "theta", ss.varname, origin="native")
+    else:
+        slc = yt.SlicePlot(ds, "z", ss.varname, origin="native")
+
+    slc.set_log(ss.varname, ss.log)
+    slc.plots[ss.varname].figure = plt.gcf()
+    slc.plots[ss.varname].axes = plt.gca()
+    #slc._setup_plots()
     slc.show()
+
+
+def set_cmd(ss, pp):
+    """ set takes a property and a value """
+
+    if pp[0] == "log":
+        if pp[1].lower() in ["true", "1", "on"]:
+            ss.log = True
+        else:
+            ss.log = False
+
+
+def replot_cmd(ss, pp):
+    plot_cmd(ss, [ss.file_info.name, ss.varname])
 
 
 def reset_cmd(ss, pp):
