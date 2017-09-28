@@ -118,8 +118,16 @@ def plot_cmd(ss, pp):
 
     ss.file_info.load(pp[0])
     ds = ss.file_info.ds
+    
+    var = pp[1]
+    if var.startswith("'") and var.endswith("'") or var.startswith('"') and var.endswith('"'):
+        var = var[1:-1]
 
-    ss.varname = pp[1]
+    if var in ss.file_info.ds.fields.gas or ('boxlib', var) in ds.field_list:
+        ss.varname = var
+    else:
+        print("invalid variable")
+        return
 
     if ss.file_info.is_axisymmetric:
         slc = yt.SlicePlot(ds, "theta", ss.varname, origin="native")
@@ -144,7 +152,7 @@ def save_cmd(ss, pp):
     except IndexError:
         print("no output file specified")
     else:
-        ofile.replace("'",""),"\"","")
+        ofile.replace("'","").replace("\"","")
 
     ss.current_plot_obj.save(ofile)
 
