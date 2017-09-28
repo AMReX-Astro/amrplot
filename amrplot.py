@@ -66,7 +66,7 @@ class State(object):
     def __init__(self, file_info):
         self.file_info = file_info
 
-        self.figure = plt.figure()
+        #self.figure = plt.figure()
 
         # coordinate limits
         self.xbounds = None
@@ -78,6 +78,8 @@ class State(object):
         self.vbounds = None
 
         self.log = False
+
+        self.current_plot_object = None
 
     def reset(self):
         # coordinate limits
@@ -90,6 +92,8 @@ class State(object):
         self.vbounds = None
 
         self.log = False
+
+        self.current_plot_object = None
 
 
 def listvar_cmd(ss, pp):
@@ -110,6 +114,8 @@ def listvar_cmd(ss, pp):
 def plot_cmd(ss, pp):
     """ plot command takes 2 arguments: plotfile, variable name """
 
+    plt.clf()
+
     ss.file_info.load(pp[0])
     ds = ss.file_info.ds
 
@@ -121,10 +127,26 @@ def plot_cmd(ss, pp):
         slc = yt.SlicePlot(ds, "z", ss.varname, origin="native")
 
     slc.set_log(ss.varname, ss.log)
-    slc.plots[ss.varname].figure = plt.gcf()
-    slc.plots[ss.varname].axes = plt.gca()
+    #slc.plots[ss.varname].figure = plt.gcf()
+    #slc.plots[ss.varname].axes = plt.gca()
+    #slc.plots[ss.varname].cax = 
     #slc._setup_plots()
     slc.show()
+
+    ss.current_plot_obj = slc
+
+
+def save_cmd(ss, pp):
+    """ takes 1 argument: filename"""
+
+    try:
+        ofile = pp[0]
+    except IndexError:
+        print("no output file specified")
+    else:
+        ofile.replace("'",""),"\"","")
+
+    ss.current_plot_obj.save(ofile)
 
 
 def set_cmd(ss, pp):
