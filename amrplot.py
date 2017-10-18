@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import matplotlib as mpl
-mpl.use("QT5Agg")
+mpl.use("QT4Agg")
 
 import matplotlib.pyplot as plt
 
@@ -118,13 +118,13 @@ class State(object):
             xwidth = (self.file_info.ds.domain_right_edge[0] -
                       self.file_info.ds.domain_left_edge[0])
         else:
-            xwidth = self.xbounds[1] - self.xbounds[0]
+            xwidth = (self.xbounds[1] - self.xbounds[0])*cm
 
         if self.ybounds is None:
             ywidth = (self.file_info.ds.domain_right_edge[1] -
                       self.file_info.ds.domain_left_edge[1])
         else:
-            ywidth = self.ybounds[1] - self.ybounds[0]
+            ywidth = (self.ybounds[1] - self.ybounds[0])*cm
 
         if self.file_info.dim == 2:
             zwidth = 0.0
@@ -133,7 +133,7 @@ class State(object):
                 zwidth = (self.file_info.ds.domain_right_edge[2] -
                           self.file_info.ds.domain_left_edge[2])
             else:
-                zwidth = self.zbounds[1] - self.zbounds[0]
+                zwidth = (self.zbounds[1] - self.zbounds[0])*cm
 
         return (xwidth, ywidth, zwidth)
 
@@ -255,11 +255,11 @@ def set_cmd(ss, pp):
             return
 
         if is_x:
-            ss.xbounds = (nmin, nmax)
+            ss.xbounds = (float(nmin), float(nmax))
         elif is_y:
-            ss.ybounds = (nmin, nmax)
+            ss.ybounds = (float(nmin), float(nmax))
         elif is_z:
-            ss.zbounds = (nmin, nmax)
+            ss.zbounds = (float(nmin), float(nmax))
 
 def replot_cmd(ss, pp):
     plot_cmd(ss, [ss.file_info.name, ss.varname])
