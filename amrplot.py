@@ -6,6 +6,7 @@ mpl.use("QT5Agg")
 import matplotlib.pyplot as plt
 
 import readline
+import re
 import sys
 
 import yt
@@ -41,6 +42,7 @@ class FileInfo(object):
     def __init__(self):
         self.name = None
         self.varlist = None
+        self.dim = -1
 
     def load(self, filename):
         filename = filename.replace("\"", "").replace("'", "")
@@ -59,6 +61,10 @@ class FileInfo(object):
             self.ds.index
             self.varlist = self.ds.field_list
             self.is_axisymmetric = self.ds.geometry == "cylindrical"
+            if self.ds.domain_dimensions[2] == 1:
+                self.dim = 2
+            else:
+                self.dim = 3
 
 class State(object):
     """ keep track of the current state of the plot, limits, etc"""
@@ -80,6 +86,57 @@ class State(object):
         self.log = False
 
         self.current_plot_object = None
+
+    def get_center(self):
+        """ get the coordinates of the center of the plot """
+        if self.xbounds is None:
+            xctr = 0.5*(self.file_info.ds.domain_left_edge[0] + 
+                        self.file_info.ds.domain_right_edge[0])
+        else:
+            xctr = 0.5*(self.xbounds[0] + self.xbounds[1])
+
+        if self.ybounds is None:
+            yctr = 0.5*(self.file_info.ds.domain_left_edge[1] + 
+                        self.file_info.ds.domain_right_edge[1])
+        else:
+            yctr = 0.5*(self.ybounds[0] + self.ybounds[1])
+
+        if self.file_info.dim == 2:
+            zctr = 0.0
+        else:
+            if self.zbounds is None:
+                zctr = 0.5*(self.file_info.ds.domain_left_edge[2] + 
+                            self.file_info.ds.domain_right_edge[2])
+            else:
+                zctr = 0.5*(self.zbounds[0] + self.zbounds[1])
+
+        return (xctr, yctr, zctr)
+
+    def get_width(self):
+        """ get the width of the plot """
+        if self.xbounds is None:
+            xwidth = (self.file_info.ds.domain_right_edge[0] -
+                      self.file_info.ds.domain_left_edge[0])
+        else:
+            xwidth = self.xbounds[1] - self.xbounds[0]
+
+        if self.ybounds is None:
+            ywidth = (self.file_info.ds.domain_right_edge[1] -
+                      self.file_info.ds.domain_left_edge[1])
+        else:
+            ywidth = self.ybounds[1] - self.ybounds[0]
+
+        if self.file_info.dim == 2:
+            zwidth = 0.0
+        else:
+            if self.zbounds is None:
+                zwidth = (self.file_info.ds.domain_right_edge[2] -
+                          self.file_info.ds.domain_left_edge[2])
+            else:
+                zwidth = self.zbounds[1] - self.zbounds[0]
+
+        return (xwidth, ywidth, zwidth)
+
 
     def reset(self):
         # coordinate limits
@@ -104,7 +161,7 @@ def listvar_cmd(ss, pp):
     except IndexError:
         pass
     else:
-        ss.file_info.load(pp[0])
+        ss.file_info.load(filename)
 
     if not ss.file_info.name is None:
         for f in ss.file_info.varlist:
@@ -118,7 +175,7 @@ def plot_cmd(ss, pp):
 
     ss.file_info.load(pp[0])
     ds = ss.file_info.ds
-    
+
     var = pp[1]
     if var.startswith("'") and var.endswith("'") or var.startswith('"') and var.endswith('"'):
         var = var[1:-1]
@@ -129,15 +186,20 @@ def plot_cmd(ss, pp):
         print("invalid variable")
         return
 
+    center = ss.get_center()
+    width = ss.get_width()
+
     if ss.file_info.is_axisymmetric:
-        slc = yt.SlicePlot(ds, "theta", ss.varname, origin="native")
+        slc = yt.SlicePlot(ds, "theta", ss.varname, origin="native",
+                           center=center, width=width)
     else:
-        slc = yt.SlicePlot(ds, "z", ss.varname, origin="native")
+        slc = yt.SlicePlot(ds, "z", ss.varname, origin="native",
+                           center=center, width=width)
 
     slc.set_log(ss.varname, ss.log)
     #slc.plots[ss.varname].figure = plt.gcf()
     #slc.plots[ss.varname].axes = plt.gca()
-    #slc.plots[ss.varname].cax = 
+    #slc.plots[ss.varname].cax =
     #slc._setup_plots()
     slc.show()
 
@@ -166,6 +228,38 @@ def set_cmd(ss, pp):
         else:
             ss.log = False
 
+    elif pp[0].lower() in ["xlim", "xrange", "ylim", "yrange"]:
+        is_x = False
+        is_y = False
+        is_z = False
+
+        if pp[0].lower().startswith("x"):
+            is_x = True
+        elif pp[0].lower().startswith("y"):
+            is_y = True
+        elif pp[0].lower().startswith("z"):
+            is_z = True
+
+        try:
+            nlim_str = " ".join(pp[1:])
+        except IndexError:
+            print("you need to specify a range")
+            return
+
+        nlim_str = nlim_str.replace("(","").replace(")","").replace("[","").replace("]","")
+        try:
+            # handle multiple delimitors -- from stack overflow
+            nmin, nmax = list(filter(None, re.split("[, ;]+", nlim_str)))
+        except ValueError:
+            print("invalid range specified")
+            return
+
+        if is_x:
+            ss.xbounds = (nmin, nmax)
+        elif is_y:
+            ss.ybounds = (nmin, nmax)
+        elif is_z:
+            ss.zbounds = (nmin, nmax)
 
 def replot_cmd(ss, pp):
     plot_cmd(ss, [ss.file_info.name, ss.varname])
