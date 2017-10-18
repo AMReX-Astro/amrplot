@@ -100,6 +100,7 @@ class State(object):
                         self.file_info.ds.domain_right_edge[1])
         else:
             yctr = 0.5*(self.ybounds[0] + self.ybounds[1])
+        print("yctr = ", yctr)
 
         if self.file_info.dim == 2:
             zctr = 0.0
@@ -191,7 +192,7 @@ def plot_cmd(ss, pp):
 
     if ss.file_info.is_axisymmetric:
         slc = yt.SlicePlot(ds, "theta", ss.varname, origin="native",
-                           center=center, width=width)
+                           center=center, width=[width[0], width[2], width[1]])
     else:
         slc = yt.SlicePlot(ds, "z", ss.varname, origin="native",
                            center=center, width=width)
