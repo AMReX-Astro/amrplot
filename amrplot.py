@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import sys
+
 import matplotlib as mpl
 mpl.use("QT4Agg")
 
@@ -14,6 +16,9 @@ import yt.utilities.exceptions as yt_except
 
 # assume that our data is in CGS
 from yt.units import cm
+
+if sys.version_info.major == 2:
+    input = raw_input
 
 #plt.ion()
 yt.toggle_interactivity()
