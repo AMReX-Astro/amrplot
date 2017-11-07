@@ -197,7 +197,7 @@ def plot_cmd(ss, pp):
 
     if ss.file_info.is_axisymmetric:
         slc = yt.SlicePlot(ds, "theta", ss.varname, origin="native",
-                           center=center, width=[width[0], width[2], width[1]])
+                           center=center, width=[width[0], width[1], width[2]])
     else:
         slc = yt.SlicePlot(ds, "z", ss.varname, origin="native",
                            center=center, width=width)
