@@ -63,7 +63,6 @@ class FileInfo(object):
                 self.name = None
                 raise IOError()
 
-            self.ds.index
             self.varlist = self.ds.field_list
             self.is_axisymmetric = self.ds.geometry == "cylindrical"
             if self.ds.domain_dimensions[2] == 1:
@@ -91,6 +90,9 @@ class State(object):
         self.log = False
 
         self.current_plot_object = None
+
+        # plot options
+        self.show_grid = False
 
     def get_center(self):
         """ get the coordinates of the center of the plot """
@@ -155,6 +157,7 @@ class State(object):
         self.vbounds = None
 
         self.log = False
+        self.show_grid = False
 
         self.current_plot_object = None
 
@@ -203,13 +206,16 @@ def plot_cmd(ss, pp):
                            center=center, width=width)
 
     slc.set_log(ss.varname, ss.log)
+    if ss.show_grid:
+        slc.annotate_grids()
+
     #slc.plots[ss.varname].figure = plt.gcf()
     #slc.plots[ss.varname].axes = plt.gca()
     #slc.plots[ss.varname].cax =
     #slc._setup_plots()
     slc.show()
 
-    ss.current_plot_obj = slc
+    ss.current_plot_object = slc
 
 
 def save_cmd(ss, pp):
@@ -252,9 +258,9 @@ def set_cmd(ss, pp):
             print("you need to specify a range")
             return
 
-        nlim_str = nlim_str.replace("(","").replace(")","").replace("[","").replace("]","")
+        nlim_str = nlim_str.replace("(", "").replace(")", "").replace("[", "").replace("]", "")
         try:
-            # handle multiple delimitors -- from stack overflow
+            # handle multiple delimiters -- from stack overflow
             nmin, nmax = list(filter(None, re.split("[, ;]+", nlim_str)))
         except ValueError:
             print("invalid range specified")
@@ -266,6 +272,17 @@ def set_cmd(ss, pp):
             ss.ybounds = (float(nmin), float(nmax))
         elif is_z:
             ss.zbounds = (float(nmin), float(nmax))
+
+    elif pp[0].lower() == "grid":
+        if pp[1].lower() in ["true", "1", "on"]:
+            ss.show_grid = True
+        else:
+            ss.show_grid = False
+
+    # Center
+    # Slice plane
+    #
+
 
 def replot_cmd(ss, pp):
     plot_cmd(ss, [ss.file_info.name, ss.varname])
