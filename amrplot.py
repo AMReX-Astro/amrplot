@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-import sys
-
 import matplotlib as mpl
 mpl.use("QT4Agg")
 
@@ -23,7 +21,7 @@ if sys.version_info.major == 2:
 #plt.ion()
 yt.toggle_interactivity()
 
-# look at this for history persistance (using atexit):
+# look at this for history persistence (using atexit):
 # https://gist.github.com/thanhtphung/20980ebee86e24933b13
 readline.parse_and_bind("tab: complete")
 readline.parse_and_bind('set editing-mode emacs')
@@ -41,12 +39,30 @@ COMMANDS = ["help",
             "save",
             "set"]
 
+# Questions:
+# ----------------------------------------------------------------------------------------------------------------------
+# 1) FileInfo.load raises an IOError after the print statement, intentional? Currently catching the errors.
+#
+# 3) Should zlim and zrange be included for the set command now that the slice plane can be changed? Appears to be some
+#    support for that already with the boolean variables.
+#
+# 3) In State.get_width, should the widths be multiplied by cm in the case that bounds = None?
+#
+# 4) What fields should be valid inputs for the plot command? Currently just catches index errors, but window pops up.
+#
+# 5) In plot_cmd, the code appears to convert the width tuple to a list before inputting it as an argument to the
+#    SlicePlot function. Why is the conversion made, does it have an effect? Not an issue, just asking out of interest.
+#
+# 6) All of the error messages are currently lower case, is that acceptable?
+
 class FileInfo(object):
     """ cache the file info so we don't have to continually load things """
 
     def __init__(self):
         self.name = None
         self.varlist = None
+        self.ds = None
+        self.is_axisymmetric = False
         self.dim = -1
 
     def load(self, filename):
@@ -76,26 +92,28 @@ class State(object):
     def __init__(self, file_info):
         self.file_info = file_info
 
-        #self.figure = plt.figure()
-
-        # coordinate limits
+        # Coordinate limits
         self.xbounds = None
         self.ybounds = None
         self.zbounds = None
 
-        # variable limits
+        # Variable limits
         self.varname = None
         self.vbounds = None
 
-        self.log = False
-
         self.current_plot_object = None
 
-        # plot options
+        # Settings
+        self.log = False
         self.show_grid = False
+        self.center = None
+        self.normal = "theta" if self.file_info.is_axisymmetric else "z"
 
     def get_center(self):
         """ get the coordinates of the center of the plot """
+        if self.center is not None:
+            return self.center
+
         if self.xbounds is None:
             xctr = 0.5*(self.file_info.ds.domain_left_edge[0] + 
                         self.file_info.ds.domain_right_edge[0])
@@ -118,10 +136,11 @@ class State(object):
             else:
                 zctr = 0.5*(self.zbounds[0] + self.zbounds[1])
 
-        return (xctr, yctr, zctr)
+        return xctr, yctr, zctr
 
     def get_width(self):
         """ get the width of the plot """
+
         if self.xbounds is None:
             xwidth = (self.file_info.ds.domain_right_edge[0] -
                       self.file_info.ds.domain_left_edge[0])
@@ -143,34 +162,26 @@ class State(object):
             else:
                 zwidth = (self.zbounds[1] - self.zbounds[0])*cm
 
-        return (xwidth, ywidth, zwidth)
+        return xwidth, ywidth, zwidth
 
 
     def reset(self):
-        # coordinate limits
-        self.xbounds = None
-        self.ybounds = None
-        self.zbounds = None
+        """ Reset the data in the State object """
 
-        # variable limits
-        self.varname = None
-        self.vbounds = None
-
-        self.log = False
-        self.show_grid = False
-
-        self.current_plot_object = None
+        self.__init__(self.file_info)
 
 
 def listvar_cmd(ss, pp):
     """ listvar command takes a single argument: plotfile """
 
+    if check_arg_error(pp, 1):
+        return
+
     try:
         filename = pp[0]
-    except IndexError:
-        pass
-    else:
         ss.file_info.load(filename)
+    except IOError:
+        return
 
     if not ss.file_info.name is None:
         for f in ss.file_info.varlist:
@@ -182,8 +193,11 @@ def plot_cmd(ss, pp):
 
     plt.clf()
 
-    ss.file_info.load(pp[0])
-    ds = ss.file_info.ds
+    try:
+        ss.file_info.load(pp[0])
+        ds = ss.file_info.ds
+    except IOError:
+        return
 
     var = pp[1]
     if var.startswith("'") and var.endswith("'") or var.startswith('"') and var.endswith('"'):
@@ -199,32 +213,42 @@ def plot_cmd(ss, pp):
     width = ss.get_width()
 
     if ss.file_info.is_axisymmetric:
-        slc = yt.SlicePlot(ds, "theta", ss.varname, origin="native",
-                           center=center, width=[width[0], width[1], width[2]])
-    else:
-        slc = yt.SlicePlot(ds, "z", ss.varname, origin="native",
+        width = [width[0], width[1], width[2]]
+
+    try:
+        slc = yt.SlicePlot(ds, ss.normal, ss.varname, origin="native",
                            center=center, width=width)
 
-    slc.set_log(ss.varname, ss.log)
-    if ss.show_grid:
-        slc.annotate_grids()
+        slc.set_log(ss.varname, ss.log)
+        if ss.show_grid:
+            slc.annotate_grids()
 
-    #slc.plots[ss.varname].figure = plt.gcf()
-    #slc.plots[ss.varname].axes = plt.gca()
-    #slc.plots[ss.varname].cax =
-    #slc._setup_plots()
-    slc.show()
+        slc.show()
+    except IndexError:
+        print("invalid variable")
+        return
+
+    #if ss.file_info.is_axisymmetric:
+        #slc = yt.SlicePlot(ds, ss.normal, ss.varname,  origin="native",
+                           #center=center, width=[width[0], width[1], width[2]])
+    #else:
+        #slc = yt.SlicePlot(ds, ss.normal, ss.varname, origin="native",
+                           #center=center, width=width)
 
     ss.current_plot_object = slc
 
 
 def save_cmd(ss, pp):
-    """ takes 1 argument: filename"""
+    """ takes 1 argument: filename """
+
+    if check_arg_error(pp, 2):
+        return
 
     try:
         ofile = pp[0]
     except IndexError:
         print("no output file specified")
+        return
     else:
         ofile.replace("'","").replace("\"","")
 
@@ -232,15 +256,30 @@ def save_cmd(ss, pp):
 
 
 def set_cmd(ss, pp):
-    """ set takes a property and a value """
+    """ set takes a property and a set of values """
 
-    if pp[0] == "log":
-        if pp[1].lower() in ["true", "1", "on"]:
+    settings = ["log", "xlim", "xrange", "ylim", "yrange", "grid", "center", "normal"]
+    setting = pp[0].lower()
+
+    if setting not in settings:
+        print("{} not supported, setting must be in : {}".format(setting, settings))
+        return
+
+    true = ["true", "1", "on", "t"]
+    false = ["false", "0", "off", "f"]
+
+    if setting == "log":
+        if check_arg_error(pp, 2):
+            return
+        if pp[1].lower() in true:
             ss.log = True
-        else:
+        elif pp[1].lower() in false:
             ss.log = False
+        else:
+            print("input must be in {} or {}".format(true, false))
 
-    elif pp[0].lower() in ["xlim", "xrange", "ylim", "yrange"]:
+    # Also zlim and zrange?
+    elif setting in ["xlim", "xrange", "ylim", "yrange"]:
         is_x = False
         is_y = False
         is_z = False
@@ -253,17 +292,11 @@ def set_cmd(ss, pp):
             is_z = True
 
         try:
-            nlim_str = " ".join(pp[1:])
-        except IndexError:
-            print("you need to specify a range")
-            return
-
-        nlim_str = nlim_str.replace("(", "").replace(")", "").replace("[", "").replace("]", "")
-        try:
-            # handle multiple delimiters -- from stack overflow
-            nmin, nmax = list(filter(None, re.split("[, ;]+", nlim_str)))
-        except ValueError:
-            print("invalid range specified")
+            nmin, nmax = map(float, parse_tuple(pp, 1))
+            if nmin > nmax:
+                raise ValueError("min ({}) must be less than max ({})".format(nmin, nmax))
+        except (ValueError, IndexError) as err:
+            print(err)
             return
 
         if is_x:
@@ -273,25 +306,78 @@ def set_cmd(ss, pp):
         elif is_z:
             ss.zbounds = (float(nmin), float(nmax))
 
-    elif pp[0].lower() == "grid":
-        if pp[1].lower() in ["true", "1", "on"]:
+    elif setting == "grid":
+        if check_arg_error(pp, 2):
+            return
+        if pp[1].lower() in true:
             ss.show_grid = True
-        else:
+        elif pp[1].lower() in false:
             ss.show_grid = False
+        else:
+            print("input must be in {} or {}".format(true, false))
 
-    # Center
-    # Slice plane
-    #
+    elif setting == "center":
+        try:
+            x, y, z = tuple(map(float, parse_tuple(pp, 1)))
+        except (ValueError, IndexError) as err:
+            print(err)
+            return
+        else:
+            ss.center = (x, y, z)
+
+    elif setting == "normal":
+        try:
+            x, y, z = tuple(map(float, parse_tuple(pp, 1)))
+        except (ValueError, IndexError) as err:
+            print(err)
+            return
+        else:
+            ss.normal = (x, y, z)
 
 
 def replot_cmd(ss, pp):
+    """ replot the current plot with new settings """
+
+    if check_arg_error(pp, 0):
+        return
+    if ss.current_plot_object is None:
+        print("state was reset or has not been set, must use plot command")
+        return
     plot_cmd(ss, [ss.file_info.name, ss.varname])
 
 
 def reset_cmd(ss, pp):
-    """ reset the plot attributes """
+    """ Reset the plot attributes """
+
+    if check_arg_error(pp, 0):
+        return
     ss.reset()
 
+def check_arg_error(pp, numargs):
+    """ Checks for an illegal number of arguments, returning whether the number of args was legal or not. """
+
+    if len(pp) != numargs:
+        print("command requires {} arguments, {} given".format(numargs, len(pp)))
+        return True
+    return False
+
+def parse_tuple(pp, startIndex, endIndex=None):
+    """ Helper method for handling a tuple of arguments. Raises index error if the indices were invalid, value error
+    if the tuple was invalid. Uses slicing - string to parse is inclusive of startIndex and exclusive of endIndex."""
+
+    try:
+        delim_str = " ".join(pp[startIndex:]) if endIndex is None else " ".join(pp[startIndex:endIndex])
+
+        # Replace brackets
+        valid_brackets = ["(", ")", "[", "]", "{", "}", "<", ">"]
+        regEx = "|".join(map(re.escape, valid_brackets))
+        delim_str = re.sub(regEx, "", delim_str)
+        # Handle multiple delimiters -- from stack overflow
+        return tuple(filter(None, re.split("[, ;]+", delim_str)))
+    except ValueError:
+        raise ValueError("unable to parse list argument, check syntax")
+    except IndexError:
+        raise IndexError("unable to read delimited list, expected as argument number {}".format(startIndex + 1))
 
 def main():
 
@@ -322,7 +408,7 @@ def main():
             print("")
 
         elif command == "quit":
-            sys.exit("good bye")
+            sys.exit("Good bye!")
 
         else:
             fname = "{}_cmd".format(command)
