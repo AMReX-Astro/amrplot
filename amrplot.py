@@ -39,22 +39,6 @@ COMMANDS = ["help",
             "save",
             "set"]
 
-# Questions:
-# ----------------------------------------------------------------------------------------------------------------------
-# 1) FileInfo.load raises an IOError after the print statement, intentional? Currently catching the errors.
-#
-# 3) Should zlim and zrange be included for the set command now that the slice plane can be changed? Appears to be some
-#    support for that already with the boolean variables.
-#
-# 3) In State.get_width, should the widths be multiplied by cm in the case that bounds = None?
-#
-# 4) What fields should be valid inputs for the plot command? Currently just catches index errors, but window pops up.
-#
-# 5) In plot_cmd, the code appears to convert the width tuple to a list before inputting it as an argument to the
-#    SlicePlot function. Why is the conversion made, does it have an effect? Not an issue, just asking out of interest.
-#
-# 6) All of the error messages are currently lower case, is that acceptable?
-
 class FileInfo(object):
     """ cache the file info so we don't have to continually load things """
 
@@ -77,7 +61,6 @@ class FileInfo(object):
             except yt_except.YTOutputNotIdentified:
                 print("file unable to be opened\n")
                 self.name = None
-                raise IOError()
 
             self.varlist = self.ds.field_list
             self.is_axisymmetric = self.ds.geometry == "cylindrical"
@@ -143,13 +126,13 @@ class State(object):
 
         if self.xbounds is None:
             xwidth = (self.file_info.ds.domain_right_edge[0] -
-                      self.file_info.ds.domain_left_edge[0])
+                      self.file_info.ds.domain_left_edge[0]).in_cgs()
         else:
             xwidth = (self.xbounds[1] - self.xbounds[0])*cm
 
         if self.ybounds is None:
             ywidth = (self.file_info.ds.domain_right_edge[1] -
-                      self.file_info.ds.domain_left_edge[1])
+                      self.file_info.ds.domain_left_edge[1]).in_cgs()
         else:
             ywidth = (self.ybounds[1] - self.ybounds[0])*cm
 
@@ -158,7 +141,7 @@ class State(object):
         else:
             if self.zbounds is None:
                 zwidth = (self.file_info.ds.domain_right_edge[2] -
-                          self.file_info.ds.domain_left_edge[2])
+                          self.file_info.ds.domain_left_edge[2]).in_cgs()
             else:
                 zwidth = (self.zbounds[1] - self.zbounds[0])*cm
 
@@ -177,11 +160,9 @@ def listvar_cmd(ss, pp):
     if check_arg_error(pp, 1):
         return
 
-    try:
-        filename = pp[0]
-        ss.file_info.load(filename)
-    except IOError:
-        return
+
+    filename = pp[0]
+    ss.file_info.load(filename)
 
     if not ss.file_info.name is None:
         for f in ss.file_info.varlist:
@@ -193,10 +174,10 @@ def plot_cmd(ss, pp):
 
     plt.clf()
 
-    try:
-        ss.file_info.load(pp[0])
-        ds = ss.file_info.ds
-    except IOError:
+    ss.file_info.load(pp[0])
+    ds = ss.file_info.ds
+
+    if ss.file_info.name is None:
         return
 
     var = pp[1]
@@ -212,28 +193,23 @@ def plot_cmd(ss, pp):
     center = ss.get_center()
     width = ss.get_width()
 
-    if ss.file_info.is_axisymmetric:
-        width = [width[0], width[1], width[2]]
 
     try:
         slc = yt.SlicePlot(ds, ss.normal, ss.varname, origin="native",
-                           center=center, width=width)
+            center=center, width=width)
+
+        try:
+            if ss.show_grid:
+                slc.annotate_grids()
+        except AttributeError:
+            print("off-axis plot, grid will not be shown")
 
         slc.set_log(ss.varname, ss.log)
-        if ss.show_grid:
-            slc.annotate_grids()
 
         slc.show()
     except IndexError:
         print("invalid variable")
         return
-
-    #if ss.file_info.is_axisymmetric:
-        #slc = yt.SlicePlot(ds, ss.normal, ss.varname,  origin="native",
-                           #center=center, width=[width[0], width[1], width[2]])
-    #else:
-        #slc = yt.SlicePlot(ds, ss.normal, ss.varname, origin="native",
-                           #center=center, width=width)
 
     ss.current_plot_object = slc
 
@@ -262,7 +238,7 @@ def set_cmd(ss, pp):
     setting = pp[0].lower()
 
     if setting not in settings:
-        print("{} not supported, setting must be in : {}".format(setting, settings))
+        print("{} not supported, setting must be in: {}".format(setting, settings))
         return
 
     true = ["true", "1", "on", "t"]
@@ -279,7 +255,7 @@ def set_cmd(ss, pp):
             print("input must be in {} or {}".format(true, false))
 
     # Also zlim and zrange?
-    elif setting in ["xlim", "xrange", "ylim", "yrange"]:
+    elif setting in ["xlim", "xrange", "ylim", "yrange", "zlim", "zrange"]:
         is_x = False
         is_y = False
         is_z = False
