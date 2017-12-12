@@ -3,7 +3,10 @@
 import matplotlib as mpl
 mpl.use("QT4Agg")
 
-import matplotlib.pyplot as plt
+
+"""from matplotlib.backends.backend_qt5 import NavigationToolbar2QT
+from matplotlib.backends.qt_compat import QtWidgets
+import matplotlib.pyplot as plt"""
 
 import readline
 import re
@@ -18,7 +21,6 @@ from yt.units import cm
 if sys.version_info.major == 2:
     input = raw_input
 
-#plt.ion()
 yt.toggle_interactivity()
 
 # look at this for history persistence (using atexit):
@@ -62,6 +64,7 @@ class FileInfo(object):
             except yt_except.YTOutputNotIdentified:
                 print("file unable to be opened\n")
                 self.name = None
+                return
 
             self.varlist = self.ds.field_list
             self.is_axisymmetric = self.ds.geometry == "cylindrical"
@@ -101,6 +104,7 @@ class State(object):
         self.show_grid = False
         self.center = None
         self.normal = "z"
+        self.zoom = 1.0
 
     def get_center(self):
         """ get the coordinates of the center of the plot """
@@ -156,7 +160,6 @@ class State(object):
                 zwidth = (self.zbounds[1] - self.zbounds[0])*cm
 
         return xwidth, ywidth, zwidth
-
 
     def get_normal(self):
         """ Returns the normal vector for the state object. """
@@ -219,7 +222,7 @@ def plot_cmd(ss, pp):
         var = pp[1]
     else:
         ds = ss.file_info.ds
-        msg = "a file must be specified if one has not been loaded"
+        msg = "both a file and a variable must be specified if the file has not been loaded"
         var = pp[0]
 
     if not ss.file_info.file_loaded(msg):
@@ -250,8 +253,15 @@ def plot_cmd(ss, pp):
                 print("unable to show grid with current plot settings")
 
         slc.set_log(ss.varname, ss.log)
+        slc.zoom(ss.zoom)
 
-        plt.clf()
+        """
+        # No figure manager for Qt4Agg backend, so it just displays the canvas, which is a C/C++ object and evidently
+        # incompatible with pyplot. Gives an error on saving, indicating that it deleted the object.
+        win = plt.get_current_fig_manager().window
+        win.setCentralWidget(slc.plots[ss.varname].canvas)
+        plt.show()"""
+
         slc.show()
 
     except IndexError:
@@ -285,7 +295,7 @@ def save_cmd(ss, pp):
 def set_cmd(ss, pp):
     """ set takes a property and a set of values """
 
-    settings = ["log", "xlim", "xrange", "ylim", "yrange", "zlim", "zrange", "grid", "center", "normal"]
+    settings = ["log", "xlim", "xrange", "ylim", "yrange", "zlim", "zrange", "grid", "center", "normal", "zoom"]
     setting = pp[0].lower()
 
     if setting not in settings:
@@ -368,6 +378,17 @@ def set_cmd(ss, pp):
             else:
                 ss.normal = (x, y, z)
 
+    elif setting == "zoom":
+        if check_arg_error(pp, 2):
+            return
+        try:
+            zoom = float(pp[1])
+            if zoom <= 0:
+                raise ValueError("zoom must be positive")
+            ss.zoom = zoom
+        except ValueError as err:
+            print(err)
+
 
 def replot_cmd(ss, pp):
     """ replot the current plot with new settings """
@@ -417,6 +438,28 @@ def parse_tuple(pp, startIndex, endIndex=None):
         raise ValueError("unable to parse list argument, check syntax")
     except IndexError:
         raise IndexError("unable to read delimited list, expected as argument number {}".format(startIndex + 1))
+
+"""def add_toolbar(canvas, window):
+    # Adds the toolbar to the main plot window. Currently unused, as the yt plot window is ostensibly not 
+    # retrievable.
+
+    # Status bar
+    statusbar_label = QtWidgets.QLabel()
+    window.statusBar().addWidget(statusbar_label)
+    
+    # Instantiates and adds toolbar
+    toolbar = NavigationToolbar2QT(canvas, window, False)
+    window.addToolBar(toolbar)
+    toolbar.message.connect(statusbar_label.setText)
+
+    # noinspection PyUnusedLocal
+    def notify_axes_change(fig):
+        # This will be called whenever the current axes are changed
+        if toolbar is not None:
+            toolbar.update()
+
+    canvas.figure.add_axobserver(notify_axes_change)
+    window.show()"""
 
 def main():
 
