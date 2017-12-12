@@ -97,7 +97,7 @@ class State(object):
         self.varname = None
         self.vbounds = None
 
-        self.current_plot_object = None
+        self.current_plot_obj = None
 
         # Settings
         self.log = False
@@ -269,7 +269,7 @@ def plot_cmd(ss, pp):
         ss.varname = None
         return
 
-    ss.current_plot_object = slc
+    ss.current_plot_obj = slc
 
 
 def save_cmd(ss, pp):
