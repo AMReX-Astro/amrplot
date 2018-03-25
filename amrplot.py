@@ -85,7 +85,7 @@ class FileInfo(object):
 class State(object):
     """ keep track of the current state of the plot, limits, etc"""
 
-    def __init__(self, file_info):
+    def __init__(self, file_info, varname=None):
         self.file_info = file_info
 
         # Coordinate limits
@@ -93,17 +93,15 @@ class State(object):
         self.ybounds = None
         self.zbounds = None
 
-        # Variable limits
-        self.varname = None
-        self.vbounds = None
-
+        # Variable and last generated plot
+        self.varname = varname
         self.current_plot_obj = None
 
         # Settings
         self.log = False
         self.show_grid = False
         self.center = None
-        self.normal = "z"
+        self.normal = 'z'
         self.zoom = 1.0
 
     def get_center(self):
@@ -112,23 +110,22 @@ class State(object):
             return self.center
 
         if self.xbounds is None:
-            xctr = 0.5*(self.file_info.ds.domain_left_edge[0] + 
+            xctr = 0.5*(self.file_info.ds.domain_left_edge[0] +
                         self.file_info.ds.domain_right_edge[0])
         else:
             xctr = 0.5*(self.xbounds[0] + self.xbounds[1])
 
         if self.ybounds is None:
-            yctr = 0.5*(self.file_info.ds.domain_left_edge[1] + 
+            yctr = 0.5*(self.file_info.ds.domain_left_edge[1] +
                         self.file_info.ds.domain_right_edge[1])
         else:
             yctr = 0.5*(self.ybounds[0] + self.ybounds[1])
-        print("yctr = ", yctr)
 
         if self.file_info.dim == 2:
             zctr = 0.0
         else:
             if self.zbounds is None:
-                zctr = 0.5*(self.file_info.ds.domain_left_edge[2] + 
+                zctr = 0.5*(self.file_info.ds.domain_left_edge[2] +
                             self.file_info.ds.domain_right_edge[2])
             else:
                 zctr = 0.5*(self.zbounds[0] + self.zbounds[1])
@@ -164,24 +161,21 @@ class State(object):
     def get_normal(self):
         """ Returns the normal vector for the state object. """
 
-        return "theta" if self.file_info.is_axisymmetric else self.normal
+        return 'theta' if self.file_info.is_axisymmetric else self.normal
 
     def is_off_axis(self):
         """ Returns false if the normal is set to a coordinate axis or the plot is axisymmetric, true otherwise. """
 
-        if self.normal != "theta" and self.file_info.is_axisymmetric:
-            print("alternate normal setting cannot be applied to axisymmetric plots")
-
         def converter(element):
-            return element if element is 0 else 1
+            return 0 if element is 0 else 1
 
-        return not (sum(map(converter, self.normal)) == 1 or self.file_info.is_axisymmetric)
+        return not (self.file_info.is_axisymmetric or sum(map(converter, self.normal)) == 1)
 
 
     def reset(self):
         """ Reset the data in the State object """
 
-        self.__init__(self.file_info)
+        self.__init__(self.file_info, self.varname)
 
 def load_cmd(ss, pp):
     """ load command takes one argument: plotfile"""
@@ -247,10 +241,15 @@ def plot_cmd(ss, pp):
             slc = yt.SlicePlot(ds, ss.get_normal(), ss.varname, origin="native", center=center, width=width)
 
         if ss.show_grid:
-            try:
-                slc.annotate_grids()
-            except AttributeError:
-                print("unable to show grid with current plot settings")
+            err_msg = "unable to show grid with current plot settings"
+
+            if ss.file_info.is_axisymmetric:
+                print(err_msg)
+            else:
+                try:
+                    slc.annotate_grids()
+                except AttributeError:
+                    print(err_msg)
 
         slc.set_log(ss.varname, ss.log)
         slc.zoom(ss.zoom)
@@ -260,7 +259,8 @@ def plot_cmd(ss, pp):
         # incompatible with pyplot. Gives an error on saving, indicating that it deleted the object.
         win = plt.get_current_fig_manager().window
         win.setCentralWidget(slc.plots[ss.varname].canvas)
-        plt.show()"""
+        plt.show()
+        """
 
         slc.show()
 
@@ -296,6 +296,11 @@ def set_cmd(ss, pp):
     """ set takes a property and a set of values """
 
     settings = ["log", "xlim", "xrange", "ylim", "yrange", "zlim", "zrange", "grid", "center", "normal", "zoom"]
+
+    if len(pp) < 1:
+        print("Available properties to set: {}".format(settings))
+        return
+
     setting = pp[0].lower()
 
     if setting not in settings:
@@ -315,16 +320,16 @@ def set_cmd(ss, pp):
         else:
             print("input must be in {} or {}".format(true, false))
 
-    elif setting in ["xlim", "xrange", "ylim", "yrange", "zlim", "zrange"]:
+    elif setting in {"xlim", "xrange", "ylim", "yrange", "zlim", "zrange"}:
         is_x = False
         is_y = False
         is_z = False
 
-        if pp[0].lower().startswith("x"):
+        if setting.startswith("x"):
             is_x = True
-        elif pp[0].lower().startswith("y"):
+        elif setting.startswith("y"):
             is_y = True
-        elif pp[0].lower().startswith("z"):
+        elif setting.startswith("z"):
             is_z = True
 
         try:
@@ -361,11 +366,8 @@ def set_cmd(ss, pp):
             ss.center = (x, y, z)
 
     elif setting == "normal":
-        if len(pp) == 2:
-            if pp[1] not in ["x", "y", "z"]:
-                print("invalid normal vector direction")
-            else:
-                ss.normal = pp[1]
+        if pp[1] in {'x', 'y', 'z'}:
+            ss.normal = pp[1]
             return
 
         try:
@@ -388,7 +390,6 @@ def set_cmd(ss, pp):
             ss.zoom = zoom
         except ValueError as err:
             print(err)
-
 
 def replot_cmd(ss, pp):
     """ replot the current plot with new settings """
@@ -440,13 +441,13 @@ def parse_tuple(pp, startIndex, endIndex=None):
         raise IndexError("unable to read delimited list, expected as argument number {}".format(startIndex + 1))
 
 """def add_toolbar(canvas, window):
-    # Adds the toolbar to the main plot window. Currently unused, as the yt plot window is ostensibly not 
+    # Adds the toolbar to the main plot window. Currently unused, as the yt plot window is ostensibly not
     # retrievable.
 
     # Status bar
     statusbar_label = QtWidgets.QLabel()
     window.statusBar().addWidget(statusbar_label)
-    
+
     # Instantiates and adds toolbar
     toolbar = NavigationToolbar2QT(canvas, window, False)
     window.addToolBar(toolbar)
